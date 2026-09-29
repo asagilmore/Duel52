@@ -6,21 +6,26 @@
 # Resumable: finished chunks are skipped. If the time limit hits, resubmit unchanged.
 #
 #SBATCH --job-name=d52-an-traps-traps
+#SBATCH --account=stf
+#SBATCH --partition=compute
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=32
+#SBATCH --cpus-per-task=32          # this is what gives one process 32 cores
 #SBATCH --mem=32G
-#SBATCH --time=2-00:00:00
-#SBATCH --output=slurm-logs/%x-%j.out
+#SBATCH --time=01-12:00:00
+#SBATCH --output=/gscratch/stf/asagil/duel52_outputs/14-analysis-traps-traps/slurm-%j.out
 
 cd "$SLURM_SUBMIT_DIR" && source run-plans/2026-09-29/slurm/lib.sh
+use_conda
+OUT="$OUT_ROOT/14-analysis-traps-traps"
 banner
 
 GAMES=${GAMES:-6144}
 # Rendered at the end; see 10-analysis-best-canonical.sbatch for what card-value measures.
 CARD_VALUE_GAMES=${CARD_VALUE_GAMES:-2000}
 
-exec .venv/bin/python -m duel52.analysis \
+exec python -m duel52.analysis \
+    --dir "$OUT/analysis" --binary ./target/release/duel52 \
     --config configs/rules/two-blast-four-bomb.toml \
     --dataset two-blast-four-bomb-4096 \
     --agents netmcts:models/duel52-traps-32c-24h-gen063.d52nn@4096 \

@@ -24,6 +24,21 @@ fi
 # module load python/3.11
 # module load cuda
 
+# Where the CPU jobs write everything: one directory per script, named for the script, holding
+# its slurm log and whatever it produces. The directory must exist BEFORE `sbatch`, because
+# slurm opens the log file before the job runs and will not create its parent (see the plan).
+OUT_ROOT=/gscratch/stf/asagil/duel52_outputs
+
+# The CPU jobs' Python: a conda env with this repo installed and built. The GPU jobs still use
+# the rnad checkout's .venv. conda's activate scripts read unset variables, so `set -u` is
+# lifted around them.
+use_conda() {
+    set +u
+    source /gscratch/escience/asagil/miniconda3/etc/profile.d/conda.sh
+    conda activate duel52
+    set -u
+}
+
 banner() {
     echo "=================================================================="
     echo "job        ${SLURM_JOB_NAME:-?} (${SLURM_JOB_ID:-?})"
@@ -31,11 +46,16 @@ banner() {
     echo "cpu        $(lscpu | sed -n 's/^Model name: *//p')"
     if grep -q avx512f /proc/cpuinfo 2>/dev/null; then echo "avx-512    yes"; else echo "avx-512    no"; fi
     echo "checkout   $(pwd)   $(git rev-parse --abbrev-ref HEAD) @ $(git rev-parse --short HEAD)"
+    echo "python     $(command -v python || echo none)   conda env ${CONDA_DEFAULT_ENV:-none}"
     echo "started    $(date -Is)"
     if command -v nvidia-smi >/dev/null; then
         nvidia-smi --query-gpu=name,memory.total --format=csv,noheader | sed 's/^/gpu        /'
     fi
     echo "=================================================================="
     [ -x ./target/release/duel52 ] || { echo "no ./target/release/duel52 — run 00-build-cpu (or -gpu) first"; exit 1; }
-    [ -x ./.venv/bin/python ] || { echo "no ./.venv — see the plan's setup section"; exit 1; }
+    if [ -n "${CONDA_DEFAULT_ENV:-}" ]; then
+        python -c "import duel52" || { echo "duel52 does not import in conda env $CONDA_DEFAULT_ENV"; exit 1; }
+    else
+        [ -x ./.venv/bin/python ] || { echo "no ./.venv — see the plan's setup section"; exit 1; }
+    fi
 }

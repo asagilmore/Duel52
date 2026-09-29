@@ -10,28 +10,33 @@
 # ⚠️ `hours` counts from the start of EACH invocation, so a resumed run gets another full 24 h
 # unless told otherwise. On a resubmit, pass what is left:
 #     sbatch --export=ALL,HOURS=9.5 run-plans/2026-09-29/slurm/20-train-base.sbatch
-# Elapsed so far is the sum of the per-generation `seconds` in runs/base-32c/log.jsonl
+# Elapsed so far is the sum of the per-generation `seconds` in
+# /gscratch/stf/asagil/duel52_outputs/20-train-base/base-32c/log.jsonl
 # (the plan has a one-liner for it).
 #
-# The time limit is 30 h, not 24. The loop checks the clock only between generations, and the
+# The time limit is 36 h, not 24. The loop checks the clock only between generations, and the
 # mod-traps run under the same config logged ~25.4 h of generations. Past 24 h it just finishes
 # the one in flight.
 #
 #SBATCH --job-name=d52-train-base
+#SBATCH --account=stf
+#SBATCH --partition=compute
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=32
-#SBATCH --mem=64G
-#SBATCH --time=1-06:00:00
-#SBATCH --output=slurm-logs/%x-%j.out
+#SBATCH --cpus-per-task=32          # this is what gives one process 32 cores
+#SBATCH --mem=32G
+#SBATCH --time=01-12:00:00
+#SBATCH --output=/gscratch/stf/asagil/duel52_outputs/20-train-base/slurm-%j.out
 
 cd "$SLURM_SUBMIT_DIR" && source run-plans/2026-09-29/slurm/lib.sh
+use_conda
+OUT="$OUT_ROOT/20-train-base"
 banner
 
 CONFIG=configs/train-24h-32c-base.toml
-RUN_DIR=runs/base-32c
+RUN_DIR="$OUT/base-32c"
 
-.venv/bin/python -m duel52.train check --config "$CONFIG"
+python -m duel52.train check --config "$CONFIG"
 
 EXTRA=()
 # The trainer refuses a non-empty run directory without --resume, so that is the test.
@@ -43,4 +48,4 @@ if [ -n "${HOURS:-}" ]; then
     EXTRA+=(--hours "$HOURS")
 fi
 
-exec .venv/bin/python -m duel52.train run --config "$CONFIG" --run-dir "$RUN_DIR" "${EXTRA[@]}"
+exec python -m duel52.train run --config "$CONFIG" --run-dir "$RUN_DIR" "${EXTRA[@]}"

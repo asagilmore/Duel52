@@ -14,14 +14,17 @@
 # login node first.
 #
 #SBATCH --job-name=d52-build-cpu
+#SBATCH --account=stf
+#SBATCH --partition=compute
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=32
-#SBATCH --mem=16G
-#SBATCH --time=01:30:00
-#SBATCH --output=slurm-logs/%x-%j.out
+#SBATCH --cpus-per-task=32          # this is what gives one process 32 cores
+#SBATCH --mem=32G
+#SBATCH --time=01-12:00:00
+#SBATCH --output=/gscratch/stf/asagil/duel52_outputs/00-build-cpu/slurm-%j.out
 
 cd "$SLURM_SUBMIT_DIR" && source run-plans/2026-09-29/slurm/lib.sh
+use_conda
 
 echo "build on $(hostname), $(date -Is)"
 if [ "${PORTABLE:-0}" = "1" ]; then
@@ -32,13 +35,14 @@ fi
 
 export CARGO_NET_OFFLINE=true
 cargo build --release
-.venv/bin/maturin develop --release
+# Rebuilds the extension into the active conda env, so it matches the binary just built.
+maturin develop --release
 
 # The tests are the only check that this CPU reproduces the engine's results. "Same seed +
 # same config → identical game" is a project invariant. `cargo test` is debug at -O1 on
 # purpose, since the debug assertions are the state checks.
 cargo test
-.venv/bin/python -m pytest py/tests -q
+python -m pytest py/tests -q
 
 ./target/release/duel52 version
 echo "build OK $(date -Is)"
