@@ -5,12 +5,9 @@
 # the top of the log, refusing to start if the build or venv is missing. The banner is the
 # record of which hardware produced which numbers.
 #
-# A job starts in the directory it was submitted from, so submit from the repository root:
-# the main checkout for the CPU jobs, and the `rnad` checkout for the GPU jobs. Each job
-# begins with
-#
-#     cd "$SLURM_SUBMIT_DIR" && source run-plans/2026-09-29/slurm/lib.sh
-#
+# Each job finds its checkout before sourcing this: the one containing the directory it was
+# submitted from, or else the one containing the .sbatch file. So submit the CPU jobs from (or
+# out of) the main checkout and the GPU jobs from the `rnad` checkout; any subdirectory works.
 # (`$0` inside a batch job is slurm's spooled copy of the script, so it cannot locate this file.)
 
 set -euo pipefail
@@ -48,8 +45,12 @@ banner() {
     echo "checkout   $(pwd)   $(git rev-parse --abbrev-ref HEAD) @ $(git rev-parse --short HEAD)"
     echo "python     $(command -v python || echo none)   conda env ${CONDA_DEFAULT_ENV:-none}"
     echo "started    $(date -Is)"
-    if command -v nvidia-smi >/dev/null; then
-        nvidia-smi --query-gpu=name,memory.total --format=csv,noheader | sed 's/^/gpu        /'
+    # CPU nodes can have nvidia-smi installed with no driver behind it, and under pipefail its
+    # failure would end the job, so a GPU is reported only when the query succeeds.
+    if gpus=$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null); then
+        echo "$gpus" | sed 's/^/gpu        /'
+    else
+        echo "gpu        none"
     fi
     echo "=================================================================="
     [ -x ./target/release/duel52 ] || { echo "no ./target/release/duel52 — run 00-build-cpu (or -gpu) first"; exit 1; }

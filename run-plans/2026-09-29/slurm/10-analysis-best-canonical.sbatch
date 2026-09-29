@@ -19,7 +19,13 @@
 #SBATCH --time=01-12:00:00
 #SBATCH --output=/gscratch/stf/asagil/duel52_outputs/10-analysis-best-canonical/slurm-%j.out
 
-cd "$SLURM_SUBMIT_DIR" && source run-plans/2026-09-29/slurm/lib.sh
+# Find the checkout from wherever this was submitted: the submit directory if it lies inside
+# one, else the directory the script itself lives in. ($0 is slurm's spooled copy, so scontrol
+# is what knows the original path.) Stop here if neither is a checkout, rather than running on.
+set -euo pipefail
+REPO=$(git -C "$SLURM_SUBMIT_DIR" rev-parse --show-toplevel 2>/dev/null \
+    || git -C "$(dirname "$(scontrol show job "$SLURM_JOB_ID" | sed -n 's/^ *Command=\([^ ]*\).*/\1/p')")" rev-parse --show-toplevel)
+cd "$REPO" && source run-plans/2026-09-29/slurm/lib.sh
 use_conda
 OUT="$OUT_ROOT/10-analysis-best-canonical"
 banner
